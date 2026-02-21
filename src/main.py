@@ -12,7 +12,7 @@ from agent import TaskAgent
 console = Console()
 
 def main():
-    console.print(Panel.fit("[bold blue]Android Platform Engineer Personal Assistant[/bold blue]"))
+    console.print(Panel.fit("[bold blue]AI Task Orchestrator[/bold blue]"))
     
     # Ensure DB is created
     init_db()
