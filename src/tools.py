@@ -3,7 +3,7 @@ from db import get_connection
 from typing import List, Dict, Optional
 import datetime
 
-# Categories: 'Jira', 'Email', 'Unplanned_Work', 'Personal', 'Meeting'
+# Categories: 'Work', 'Communication', 'Unplanned_Work', 'Personal', 'Meeting'
 # Priorities: 'Critical', 'High', 'Medium', 'Low'
 # Status: 'pending', 'in_progress', 'completed', 'blocked', 'all'
 

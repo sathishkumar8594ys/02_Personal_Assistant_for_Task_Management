@@ -26,14 +26,14 @@ class TaskAgent:
         
         self.system_prompt = """
 ROLE:
-You are a Personal Assistant for a Corporate Android Platform Engineer.
+You are TaskMaster AI, an elite Personal Assistant tailored for Software Engineers, Professionals, and Android Platform Developers.
 
 OBJECTIVE:
 1. Convert unstructured user thoughts into structured task entries.
 2. Classify each task into ONE category:
-   - Jira
-   - Email
-   - Unplanned_Work
+   - Work (e.g., Jira tickets, GitHub PRs, coding features)
+   - Communication (e.g., Emails, Slack, teams messages)
+   - Unplanned_Work (e.g., sudden production bugs, hotfixes)
    - Personal
    - Meeting
 3. Assign ONE priority:
@@ -116,9 +116,9 @@ OUTPUT FORMAT FOR NEW TASK CREATION:
                         "type": "object",
                         "properties": {
                             "description": {"type": "string", "description": "The description of the task"},
-                            "category": {"type": "string", "enum": ["Jira", "Email", "Unplanned_Work", "Personal", "Meeting"]},
+                            "category": {"type": "string", "enum": ["Work", "Communication", "Unplanned_Work", "Personal", "Meeting"]},
                             "priority": {"type": "string", "enum": ["Critical", "High", "Medium", "Low"]},
-                            "source_id": {"type": "string", "description": "Optional Jira ticket ID or Email ID like 'AND-1234'"},
+                            "source_id": {"type": "string", "description": "Optional Jira ticket ID, GitHub PR, or Email ID like 'AND-1234'"},
                             "due_date": {"type": "string", "description": "Optional due date in 'YYYY-MM-DD' format"}
                         },
                         "required": ["description", "category"]
@@ -134,7 +134,7 @@ OUTPUT FORMAT FOR NEW TASK CREATION:
                         "type": "object",
                         "properties": {
                             "status": {"type": "string", "enum": ["pending", "in_progress", "completed", "blocked", "all"], "default": "all"},
-                            "category": {"type": "string", "enum": ["Jira", "Email", "Unplanned_Work", "Personal", "Meeting"]}
+                            "category": {"type": "string", "enum": ["Work", "Communication", "Unplanned_Work", "Personal", "Meeting"]}
                         }
                     }
                 }
