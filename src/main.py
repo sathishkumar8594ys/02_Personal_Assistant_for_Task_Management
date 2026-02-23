@@ -1,10 +1,12 @@
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 from rich.console import Console
 from rich.panel import Panel
 
-# Load environment variables (from .env or user system)
-load_dotenv()
+# Load environment variables - explicitly point to the .env in the project root
+env_path = Path(__file__).resolve().parent.parent / ".env"
+load_dotenv(dotenv_path=env_path)
 
 from db import init_db
 from agent import TaskAgent

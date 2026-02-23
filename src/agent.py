@@ -1,7 +1,7 @@
 import os
 import json
 import re
-from openai import OpenAI
+import ollama
 from tools import add_task, list_tasks, search_historical_tasks, update_task, delete_task
 from rich.console import Console
 import logging
@@ -12,17 +12,8 @@ console = Console()
 
 class TaskAgent:
     def __init__(self):
-        # We can use Groq or OpenAI depending on the .env setup. 
-        # Using a default compatible base_url for local LLMs or Groq
-        api_key = os.environ.get("GROQ_API_KEY") or os.environ.get("OPENAI_API_KEY")
-        base_url = os.environ.get("AI_BASE_URL")
-        
-        if not api_key:
-            raise ValueError("API Key not found. Please set GROQ_API_KEY or OPENAI_API_KEY in your environment.")
-            
-        self.client = OpenAI(api_key=api_key, base_url=base_url)
-        # Using Llama 3 on Groq as default, fallback to gpt-3.5-turbo if OpenAI
-        self.model = os.environ.get("AI_MODEL")
+        # Using Llama 3.1 local model via Ollama
+        self.model = os.environ.get("LLAMA3_1_8B_LOCAL_MODEL", "llama3.1:8b-instruct-q4_K_M")
         
         self.system_prompt = """
 ROLE:
@@ -206,51 +197,46 @@ OUTPUT FORMAT FOR NEW TASK CREATION:
         while iterations < max_iterations:
             iterations += 1
             try:
-                response = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=self.messages,
-                    tools=self.tools,
-                    tool_choice="auto",
-                )
+                # If the last message was a tool/user result, DO NOT provide tools again so the LLM is forced to respond to the user.
+                if self.messages and self.messages[-1]["role"] == "user" and "returned:" in self.messages[-1]["content"]:
+                    response = ollama.chat(
+                        model=self.model,
+                        messages=self.messages
+                    )
+                else:
+                    response = ollama.chat(
+                        model=self.model,
+                        messages=self.messages,
+                        tools=self.tools,
+                    )
             except Exception as e:
-                error_msg = str(e)
-                if "failed_generation" in error_msg:
-                    match = re.search(r"<function=(\w+)(.*?)</function>", error_msg)
-                    if match:
-                        func_name = match.group(1)
-                        func_args_str = match.group(2)
-                        try:
-                            func_args = json.loads(func_args_str)
-                        except json.JSONDecodeError:
-                            func_args = {}
-                        if not isinstance(func_args, dict):
-                            func_args = {}
-                            
-                        if func_name in self.available_functions:
-                            logging.info(f"GROQ RECOVERED TOOL CALL: {func_name}({func_args})")
-                            # Silently execute the tool instead of printing to console
-                            func_to_call = self.available_functions[func_name]
-                            try:
-                                func_response = func_to_call(**func_args)
-                            except Exception as ex:
-                                func_response = f"Error executing tool: {str(ex)}"
-                                
-                            logging.info(f"GROQ RECOVERED TOOL RESULT: {func_response}")
-                            self.messages.append({"role": "user", "content": f"The tool '{func_name}' was automatically recovered and executed. Result: {func_response}. Please continue answering."})
-                            continue
                 raise e
             
-            response_message = response.choices[0].message
-            self.messages.append(response_message)
+            response_message = response.message
+            
+            message_dict = {
+                "role": response_message.role,
+                "content": response_message.content or "",
+            }
+            
+            if response_message.tool_calls:
+                message_dict["tool_calls"] = [
+                    {
+                        "function": {
+                            "name": tc.function.name,
+                            "arguments": tc.function.arguments
+                        }
+                    }
+                    for tc in response_message.tool_calls
+                ]
+            
+            self.messages.append(message_dict)
             
             if response_message.tool_calls:
                 for tool_call in response_message.tool_calls:
                     function_name = tool_call.function.name
                     function_to_call = self.available_functions[function_name]
-                    try:
-                        function_args = json.loads(tool_call.function.arguments) if tool_call.function.arguments else {}
-                    except json.JSONDecodeError:
-                        function_args = {}
+                    function_args = tool_call.function.arguments
                     if not isinstance(function_args, dict):
                         function_args = {}
                     
@@ -264,10 +250,8 @@ OUTPUT FORMAT FOR NEW TASK CREATION:
                     logging.info(f"NATIVE TOOL RESULT: {function_response}")
                     self.messages.append(
                         {
-                            "tool_call_id": tool_call.id,
-                            "role": "tool",
-                            "name": function_name,
-                            "content": str(function_response),
+                            "role": "user",
+                            "content": f"The tool '{function_name}' returned:\n{str(function_response)}\n\nPlease summarize this for the user without making up any additional information.",
                         }
                     )
             else:
