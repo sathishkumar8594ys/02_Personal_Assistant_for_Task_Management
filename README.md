@@ -3,7 +3,7 @@
 ## Overview
 This project is an AI-powered conversational CLI orchestrator built for Professionals, Software Engineers, and Android Platform Developers. Unlike generic "to-do list" applications, this AI autonomously interprets unstructured engineering brain-dumps (e.g., "I hit a blocker on Jira AND-1234, also remind me to check the Bluetooth HAL") and systematically structures them into a permanent database.
 
-It uses a **ReAct (Reasoning + Acting)** loop to seamlessly connect the Groq/OpenAI Large Language Models to local Python execution.
+It uses a **ReAct (Reasoning + Acting)** loop to seamlessly connect **local Large Language Models** (via Ollama) to local Python execution. 100% private, no API keys needed.
 
 ---
 
@@ -17,10 +17,8 @@ The AI operates using a 5-iteration bounded reasoning loop.
 4. **Execution**: The local Python backend safely intercepts this JSON, executes the SQL database command, and returns the raw data back to the LLM.
 5. **Synthesis**: The LLM reads the database response and formats a human-readable conversational reply.
 
-#### Hallucination Resistance & Recovery
-A common failure point in ReAct agents is LLM hallucination (requesting tools that don't exist, or omitting required parameters). This project implements two advanced safeguards:
-* **JSON Schema Enforcement**: All required parameters in `tools.py` naturally fallback to empty strings instead of throwing unhandled exceptions if the LLM emits `{}`.
-* **Regex Fallback Recovery**: If the Groq API fails to natively parse the LLM's XML response into a tool call, `agent.py` catches the `failed_generation` exception, runs a Regex extractor to find `<function=...>`, and manually injects the execution back into the loop.
+#### Robust Tool Execution
+The agent uses the native `ollama` Python client to directly parse JSON tool-call schema requirements. To prevent infinite loops caused by LLM tool recursion (where the model repeatedly requests the same data), `agent.py` actively intercepts tool responses and forces the LLM to summarize the data directly for the user.
 
 ### 2. The Database Layer (`src/db.py`)
 Data is stored permanently outside of the project repository at `~/.task_manager_ai/tasks.db`. This ensures that even if the developer clones the repo, updates the logic, or deletes the development folder, their personal tasks remain safe.
@@ -48,26 +46,26 @@ The LLM is granted access to the following deterministic SQL wrappers:
 
 ## Setup Instructions
 
-1. **Install Dependencies**:
+1. **Prerequisite**: Install [Ollama](https://ollama.com/) on your local machine and pull the required model (e.g., `llama3.1:8b`).
+   ```bash
+   ollama pull llama3.1:8b-instruct-q4_K_M
+   ```
+
+2. **Install Python Dependencies**:
    ```bash
    python -m venv venv
    source venv/bin/activate
    pip install -r requirements.txt
    ```
 
-2. **Environment Variables**:
-   Create a `.env` file in the root of the project with your LLM API key. The agent supports both Groq and OpenAI natively:
+3. **Environment Variables**:
+   Create a `.env` file in the root of the project to override the default local model if you choose to use a different one. 
    ```env
-   GROQ_API_KEY="gsk_..."
-   AI_BASE_URL="https://api.groq.com/openai/v1"
-   AI_MODEL="llama-3.3-70b-versatile"
-   
-   # Or for OpenAI:
-   # OPENAI_API_KEY="sk-..."
-   # AI_MODEL="gpt-4o"
+   # Optional: Override the default Ollama model ID
+   LLAMA3_1_8B_LOCAL_MODEL="llama3.1:8b-instruct-q4_K_M"
    ```
 
-3. **Run the Assistant**:
+4. **Run the Assistant**:
    ```bash
    python src/main.py
    ```
